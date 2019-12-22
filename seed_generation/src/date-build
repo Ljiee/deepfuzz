@@ -1,0 +1,41 @@
+#!/opt/tsmart-date/tbash
+. $(dirname "$0")/lib-common
+
+[[ "$#" == 0 ]] && log-error "No build command" && exit
+
+load-config
+if [[ "$MODE" == sym ]]; then
+    . $(dirname "$0")/lib-sym
+    setup-wllvm
+    setup-sym-flags
+else
+    . $(dirname "$0")/lib-dyn
+    setup-allvm
+    setup-dyn-flags
+fi
+
+case "$1" in
+    'gcc')
+        ;&
+    'clang')
+        log-info "C compiler intercepted"
+        run-cc "${@:2}"
+        ;;
+    'g++')
+        ;&
+    'clang++')
+        log-info "C++ compiler intercepted"
+        run-cxx "${@:2}"
+        ;;
+    'make')
+        log-info "Make intercepted"
+        inject-flags
+        inject-compilers
+        run-program "$@"
+        ;;
+    *)
+        log-info "Custom build comand, ignoring"
+        inject-flags
+        run-program "$@"
+        ;;
+esac

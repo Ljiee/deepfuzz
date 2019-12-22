@@ -1,0 +1,3 @@
+#!/bin/bash
+
+cp -rv src -T /opt/tsmart-date

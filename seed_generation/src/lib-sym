@@ -1,0 +1,35 @@
+#!/bin/bash
+. $(dirname "$0")/lib-common
+
+KLLVM_PREFIX=/opt/llvm
+WLLVM_PREFIX=/opt/wllvm
+
+KLEE_PREFIX=/opt/klee
+KLEE="$KLEE_PREFIX"/bin/klee
+
+setup-sym-flags() {
+    ARR_CXXFLAGS=("-stdlib=libc++" "-I$KLLVM_PREFIX/include/c++/v1" "-Qunused-arguments")
+    ARR_LDFLAGS=("-L$KLLVM_PREFIX/lib" "-Wl,-rpath,$KLLVM_PREFIX/lib")
+}
+
+setup-kllvm() {
+    log-info "Setting up bitcode toolchain (unfiltered)"
+    log-debug "LLVM is at $KLLVM_PREFIX"
+
+    setup-toolchain
+    ln -s "$KLLVM_PREFIX"/bin/clang   "$CC"
+    ln -s "$KLLVM_PREFIX"/bin/clang++ "$CXX"
+    ln -s "$AS_PREFIX"/bin/as         "$AS"
+}
+
+setup-wllvm() {
+    log-info "Setting up bitcode toolchain"
+    log-debug "WLLVM is at $WLLVM_PREFIX"
+
+    setup-toolchain
+    ln -s "$WLLVM_PREFIX"/bin/wllvm    "$CC"
+    ln -s "$WLLVM_PREFIX"/bin/wllvm++  "$CXX"
+    ln -s "$AS_PREFIX"/bin/wllvm-as    "$AS"
+
+    export LLVM_COMPILER=clang LLVM_COMPILER_PATH="$KLLVM_PREFIX"/bin
+}

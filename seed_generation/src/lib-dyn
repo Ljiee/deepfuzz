@@ -1,0 +1,33 @@
+#!/bin/bash
+. $(dirname "$0")/lib-common
+
+AFL_PREFIX=/opt/afl
+
+# Quiet by default
+export AFL_QUIET="${AFL_QUIET:-1}"
+[[ "$AFL_QUIET" == "0" ]] && unset AFL_QUIET
+
+setup-dyn-flags() {
+    local opts=(
+        "-fno-omit-frame-pointer"
+        "-g"
+        "-fsanitize=address")
+    ARR_CFLAGS=("${opts[@]}")
+    ARR_CXXFLAGS=("${opts[@]}")
+    ARR_LDFLAGS=("${opts[@]}")
+}
+
+setup-allvm() {
+    log-info "Setting up AFL toolchain"
+    log-debug "AFL LLVM is at $AFL_PREFIX"
+
+    setup-toolchain
+    ln -s "$AFL_PREFIX"/bin/afl-clang-fast   "$CC"
+    ln -s "$AFL_PREFIX"/bin/afl-clang-fast++ "$CXX"
+    ln -s "$AS_PREFIX"/bin/as                "$AS"
+
+    export AFL_CXX="$SLLVM_PREFIX/bin/clang++" \
+           AFL_CC="$SLLVM_PREFIX/bin/clang" \
+           AFL_AS="$AS_PREFIX/bin/as" \
+           AFL_PATH="$AFL_PREFIX/bin"
+}

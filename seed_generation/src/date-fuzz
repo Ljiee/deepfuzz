@@ -1,0 +1,77 @@
+#!/opt/tsmart-date/tbash
+set -eu
+. $(dirname "$0")/lib-common
+
+sym-fuzz() {
+    local klee_args=(
+        "-only-output-states-covering-new"
+        "-libc=uclibc"
+        "-posix-runtime"
+        "-simplify-sym-indices"
+    )
+
+    local arg_max_memory="${MAX_MEM:-2000}"
+    local arg_max_time="${MAX_TIME:-1200}"
+    local app_bc_path="$1"
+
+    log-debug "Symbolic argument size = $SYM_ARG_SIZE"
+    log-debug "Application is at $app_bc_path"
+
+    log-info "Starting symbolic execution"
+    klee_args+=(
+        "-max-instruction-time=30"
+        "-max-memory=$arg_max_memory"
+        "-max-time=$arg_max_time"
+        "-max-sym-array-size=4096"
+    )
+
+    local args=("$KLEE" "${klee_args[@]}" "$app_bc_path" -sym-arg "$SYM_ARG_SIZE")
+    print-args "KLEE cmdline:" "${args[@]}"
+    "${args[@]}"
+}
+
+dyn-fuzz() {
+    if [[ "$1" != "-afl_mode" ]]; then
+        # local args=("$AFL_PREFIX/bin/afl-fuzz" "-m 20981520 -t 1000" "$@")
+        # print-args "AFL cmdline:" "${args[@]}"
+        # "${args[@]}"
+        tmux new -s deep_fuzzer -d
+
+        tmux send -t "deep_fuzzer" "$AFL_PREFIX/bin/afl-fuzz -i ../sym/seed -o out -m 20981520 -t 1000  -M master $@" Enter
+
+        tmux split-window -h -t "deep_fuzzer"
+        tmux send -t "deep_fuzzer" "$AFL_PREFIX/bin/afl-fuzz -i ../sym/seed -o out  -m 20981520 -t 1000 -S fuzzer1 $@" Enter
+        # 默认上下分屏
+        tmux split-window -t "deep_fuzzer"
+        tmux select-pane -L
+        tmux split-window -t "deep_fuzzer"
+        tmux send -t "deep_fuzzer" "$AFL_PREFIX/bin/afl-fuzz -i ../sym/seed -o out -m 20981520 -t 1000  -S fuzzer2 $@" Enter
+        tmux select-pane -R
+        tmux send -t "deep_fuzzer" "$AFL_PREFIX/bin/afl-fuzz -i ../sym/seed -o out  -m 20981520 -t 1000  -S fuzzer3 $@" Enter
+
+        tmux attach -t deep_fuzzer
+
+     else
+        local args=("$AFL_PREFIX/bin/afl-fuzz" "-m 20981520" "${@:2}")
+        print-args "AFL cmdline:" "${args[@]}"
+        "${args[@]}"
+     fi
+
+}
+
+usage() {
+    local prog="$(basename "$0")"
+    log-error "Usage\n" \
+              "    $prog app\n"
+}
+
+[[ "$#" == 0 ]] && usage
+
+load-config
+if [[ "$MODE" == sym ]]; then
+    . $(dirname "$0")/lib-sym
+    sym-fuzz "$1.bc"
+else
+    . $(dirname "$0")/lib-dyn
+    dyn-fuzz "$@"
+fi

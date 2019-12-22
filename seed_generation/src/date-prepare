@@ -1,0 +1,30 @@
+#!/opt/tsmart-date/tbash
+. $(dirname "$0")/lib-common
+# PATH="$( cd "$( dirname "$_" )" && pwd ):$PATH"
+
+usage() {
+    local PROG="$(basename "$0")"
+    log-error "Usage\n" \
+              "    $PROG sym SYM_SIZE  -- symbolic mode\n" \
+              "    $PROG dyn           -- dynamic mode"
+}
+
+[[ "$#" == 0 ]] && usage
+
+setup-toolchain
+
+case "$1" in
+    'sym')
+        [[ "$2" =~ ^[0-9]*$ ]] || log-error "symbolic argument size not a number"
+        [[ "$2" -ge 1 && "$2" -le 4095 ]] || log-error "Symbolic argument size too big or small"
+        log-info "Saving configuration (symbolic, size is $2)"
+        save-config "$1" "$2"
+    ;;
+    'dyn')
+        log-info "Saving configuration (dynamic)"
+        save-config "$1" ""
+    ;;
+    *)
+        usage
+    ;;
+esac

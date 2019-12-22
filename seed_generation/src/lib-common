@@ -1,0 +1,102 @@
+#!/bin/bash
+set -eu
+export LD_LIBRARY_PATH=/opt/lib
+
+# =========== Configuration ===========
+
+TOOLCHAIN_PREFIX=/tmp/toolchain
+CONFIG_PATH="$TOOLCHAIN_PREFIX/config"
+AS_PREFIX=/usr
+SLLVM_PREFIX=/opt/llvm5
+
+# =========== Constants ===========
+
+AS="$TOOLCHAIN_PREFIX/as"
+CC="$TOOLCHAIN_PREFIX/clang"
+CXX="$TOOLCHAIN_PREFIX/clang++"
+
+# =========== Variables ===========
+
+declare -a ARR_CFLAGS=()
+declare -a ARR_CXXFLAGS=()
+declare -a ARR_LDFLAGS=()
+declare -a ARR_EXT_ARGS=()
+
+# =========== Loggers ===========
+
+log-debug() {
+    echo -e "\e[94m[*]\e[0m $*"
+}
+
+log-info() {
+    echo -e "\e[92m[+]\e[0m $*"
+}
+
+log-error() {
+    echo -e "\e[91m[!]\e[0m $*"
+    exit 1
+}
+
+print-args() {
+    [[ "$#" -le 2 ]] && return
+    log-debug "$1"
+    for arg in "${@:2}"; do
+        log-debug "\t$arg"
+    done
+}
+
+# =========== Setup ===========
+
+inject-flags() {
+    local opts=("CXXFLAGS=${ARR_CXXFLAGS[*]} ${CXXFLAGS:-}"
+                "CFLAGS=${ARR_CFLAGS[*]} ${CFLAGS:-}"
+                "LDFLAGS=${ARR_LDFLAGS[*]} ${LDFLAGS:-}")
+    export "${opts[@]}"
+}
+
+inject-compilers() {
+    local opts=("CC=$CC" "CXX=$CXX" "AS=$AS")
+    export "${opts[@]}"
+}
+
+setup-toolchain() {
+	log-debug "Toolchain is at $TOOLCHAIN_PREFIX"
+	mkdir -p "$TOOLCHAIN_PREFIX"
+	rm -f "$AS" "$CXX" "$CC"
+}
+
+# Config
+
+save-config() {
+    cat > "$TOOLCHAIN_PREFIX/config" <<EOF
+# Configuration for TSmart-DATE, don't edit!
+MODE="$1"
+SYM_ARG_SIZE="$2"
+EOF
+}
+
+load-config() {
+    [[ -e "$CONFIG_PATH" ]] || log-error "Run date-prepare first"
+    . "$TOOLCHAIN_PREFIX/config"
+    log-debug "Config: $MODE $SYM_ARG_SIZE"
+}
+
+# =========== Wrapper ===========
+
+run-program() {
+    print-args "Additional argument(s) to pass:" "${ARR_EXT_ARGS[@]}"
+    log-info "Running target program"
+    "$@" "${ARR_EXT_ARGS[@]}"
+}
+
+run-cc() {
+    args=("$CC" "${ARR_CFLAGS[@]}" "${ARR_EXT_ARGS[@]}" "${@}")
+    print-args "Command to execute:" "${args[@]}"
+    "${args[@]}"
+}
+
+run-cxx() {
+    args=("$CXX" "${ARR_CXXFLAGS[@]}" "${ARR_EXT_ARGS[@]}" "${@}")
+    print-args "Command to execute:" "${args[@]}"
+    "${args[@]}"
+}

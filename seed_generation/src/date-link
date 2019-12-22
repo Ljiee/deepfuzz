@@ -1,0 +1,56 @@
+#!/opt/tsmart-date/tbash
+set -eu
+. $(dirname "$0")/lib-common
+
+usage() {
+    local prog="$(basename "$0")"
+    log-error "Usage\n" \
+              "    $prog obj-file [...]\n"
+}
+
+generate-sym-driver() {
+    local src_path="$TOOLCHAIN_PREFIX/driver.c"
+    log-info "Generating driver, symbolic argument size = $SYM_ARG_SIZE"
+
+    cat > "$src_path" <<EOF
+#include <stdlib.h>
+#include <stdint.h>
+
+int LLVMFuzzerTestOneInput(const char *Data, size_t Size);
+
+int main(int argc, char **argv) {
+  LLVMFuzzerTestOneInput(argv[1], $SYM_ARG_SIZE);
+}
+EOF
+    run-cc -xc -c -o "$OBJ_PATH" "$src_path"
+}
+
+link-objects() {
+    log-info "Linking objects"
+    args=("$@" -o app)
+    run-cxx "${ARR_LDFLAGS[@]}" "${args[@]}"
+}
+
+extract-bitcode() {
+    log-info "Extracting bitcode"
+    "$WLLVM_PREFIX/bin/extract-bc" -v app
+}
+
+[[ "$#" == 0 ]] && usage
+
+load-config
+if [[ "$MODE" == sym ]]; then
+    . $(dirname "$0")/lib-sym
+    setup-wllvm
+    setup-sym-flags
+    OBJ_PATH="$TOOLCHAIN_PREFIX/driver.o"
+    generate-sym-driver "$OBJ_PATH"
+    link-objects "$OBJ_PATH" "$@"
+    extract-bitcode
+else
+    . $(dirname "$0")/lib-dyn
+    setup-allvm
+    setup-dyn-flags
+    OBJ_PATH="$AFL_PREFIX/bin/afl-driver-64.o"
+    link-objects "$OBJ_PATH" "$@"
+fi

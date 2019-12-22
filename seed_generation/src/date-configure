@@ -1,0 +1,21 @@
+#!/opt/tsmart-date/tbash
+. $(dirname "$0")/lib-common
+
+[[ "$#" == 0 ]] && log-error "No configure command" && exit
+
+load-config
+if [[ "$MODE" == sym ]]; then
+    . $(dirname "$0")/lib-sym
+    setup-kllvm
+    setup-sym-flags
+    inject-flags
+    inject-compilers
+else
+    . $(dirname "$0")/lib-dyn
+    setup-allvm
+    setup-dyn-flags
+    inject-flags
+    inject-compilers
+fi
+
+run-program "$@"
